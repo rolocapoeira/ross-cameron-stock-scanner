@@ -65,7 +65,7 @@ function StockRow({ stock, index, onClick, isSelected, previousPrice }) {
         {parseFloat(stock.gap) >= 0 ? '+' : ''}{stock.gap}%
       </td>
       <td className="float">{stock.float}</td>
-      <td className={`rvol ${rvolClass}`}>{stock.rvol}x</td>
+      <td className={`rvol ${rvolClass}`}>{stock.rvol == null ? 'N/D' : `${stock.rvol}x`}</td>
     </tr>
   );
 }
