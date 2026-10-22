@@ -365,13 +365,14 @@ function App() {
       if (isUnmounting) return;
 
       try {
-        const ws = new WebSocket('ws://localhost:3001');
-
+        const ws = new WebSocket('wss://ross-cameron-stock-scanner.onrender.com');
+        
         ws.onopen = () => {
           console.log('Connected to scanner backend');
           setConnected(true);
         };
 
+        
         ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
