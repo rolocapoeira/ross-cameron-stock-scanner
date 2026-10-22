@@ -118,7 +118,7 @@ async function scrapePremarketGainers() {
             gap: changePercent.toFixed(2),
             float: formatFloat(marketCap / 10), // Rough estimate
             floatRaw: marketCap / 10,
-            rvol: '1.00',
+            rvol: null,
             high: price.toFixed(2),
             low: price.toFixed(2),
             open: price.toFixed(2),
