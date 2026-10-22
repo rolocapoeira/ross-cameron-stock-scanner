@@ -291,6 +291,74 @@ async function fetchYahooScreener(scrId, count = 50) {
   }
 }
 
+const rvolCache = new Map();
+const RVOL_CACHE_MS = 6 * 60 * 60 * 1000;
+
+async function getAverageVolume20D(symbol) {
+  const cached = rvolCache.get(symbol);
+
+  if (cached && Date.now() - cached.time < RVOL_CACHE_MS) {
+    return cached.avgVolume;
+  }
+
+  try {
+    const url =
+      `https://query1.finance.yahoo.com/v8/finance/chart/` +
+      `${encodeURIComponent(symbol)}?range=3mo&interval=1d`;
+
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+
+    const timestamps = result?.timestamp || [];
+    const volumes = result?.indicators?.quote?.[0]?.volume || [];
+
+    // Excluir la jornada actual, que puede estar incompleta.
+    const todayET = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date());
+
+    const pastVolumes = volumes.filter((volume, index) => {
+      const timestamp = timestamps[index];
+      if (!timestamp || !Number.isFinite(volume) || volume <= 0) {
+        return false;
+      }
+
+      const dateET = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(new Date(timestamp * 1000));
+
+      return dateET < todayET;
+    }).slice(-20);
+
+    if (pastVolumes.length < 20) return null;
+
+    const avgVolume =
+      pastVolumes.reduce((sum, value) => sum + value, 0) / 20;
+
+    rvolCache.set(symbol, {
+      avgVolume,
+      time: Date.now()
+    });
+
+    return avgVolume;
+  } catch (error) {
+    console.error(`RVOL history ${symbol}:`, error.message);
+    return null;
+  }
+}
+
 function transformYahooStock(quote) {
   const price = quote.regularMarketPrice || 0;
   const change = quote.regularMarketChange || 0;
@@ -402,6 +470,27 @@ async function refreshData() {
         scrapePremarketLosers(),
         scrapePremarketActive()
       ]);
+    }
+    
+    // RVOL diario de 20 ruedas.
+    // Primera prueba: enriquecer solamente Top Gainers.
+    const uniqueGainers = [
+      ...new Map(gainers.map(s => [s.symbol, s])).values()
+    ];
+
+    // Máximo 5 consultas simultáneas.
+    for (let i = 0; i < uniqueGainers.length; i += 5) {
+      const batch = uniqueGainers.slice(i, i + 5);
+
+      await Promise.all(batch.map(async stock => {
+        const avgVolume = await getAverageVolume20D(stock.symbol);
+
+        stock.rvol =
+          avgVolume > 0 &&
+          Number.isFinite(stock.volumeRaw)
+            ? (stock.volumeRaw / avgVolume).toFixed(2)
+            : null;
+      }));
     }
 
     // Format data for display
