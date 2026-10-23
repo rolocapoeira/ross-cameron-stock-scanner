@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Sound alert for momentum stocks
 const playAlert = (type = 'momentum') => {
